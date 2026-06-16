@@ -1,0 +1,26 @@
+{
+  "name": "robot-car-frontend",
+  "version": "1.0.0",
+  "description": "Frontend React/Vite para controlar un carrito 4WD y visualizar la ESP32-CAM.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "start": "node server.js",
+    "preview": "vite preview --host 0.0.0.0",
+    "heroku-postbuild": "npm run build"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.16"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
