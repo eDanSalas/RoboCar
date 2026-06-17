@@ -36,7 +36,7 @@ Vista previa del build:
 npm run preview
 ```
 
-Servidor de produccion usado por Heroku:
+Servidor de produccion:
 
 ```bash
 npm start
@@ -56,25 +56,38 @@ VITE_API_TOKEN=change_me
 
 El token debe coincidir con `API_TOKEN` en el `.env` del backend.
 
-En Heroku estas variables deben configurarse como Config Vars antes del despliegue, porque Vite las inserta durante `npm run build`.
+En desarrollo, Vite lee las variables `VITE_*` desde `.env`.
 
-## Heroku
-
-Este frontend incluye `Procfile`, `heroku-postbuild` y un servidor Node estatico para servir `dist/`.
-
-Config Vars recomendadas:
+En produccion, el servidor `npm start` genera `/config.js` en runtime. Puedes usar `VITE_*` o estos alias:
 
 ```text
-VITE_API_BASE_URL=https://robotcar-backend.herokuapp.com
-VITE_SOCKET_URL=https://robotcar-backend.herokuapp.com
-VITE_API_TOKEN=tu_api_token
+PUBLIC_API_BASE_URL=https://tu-backend.com
+PUBLIC_SOCKET_URL=https://tu-backend.com
+PUBLIC_API_TOKEN=tu_api_token
 ```
 
-Despliegue desde el monorepo:
+Esto permite cambiar la URL del backend o token desde variables del host sin reconstruir el bundle.
 
-```bash
-git subtree push --prefix frontend heroku-frontend main
+## Deploy
+
+Este frontend incluye `Procfile`, `heroku-postbuild` y un servidor Node estatico para servir `dist/`. Puede desplegarse en Heroku, Railway, Render, Fly.io, VPS u otro host Node.
+
+Variables recomendadas de produccion:
+
+```text
+PUBLIC_API_BASE_URL=https://tu-backend.com
+PUBLIC_SOCKET_URL=https://tu-backend.com
+PUBLIC_API_TOKEN=tu_api_token
 ```
+
+Comandos genericos:
+
+```text
+Build command: npm install && npm run build
+Start command: npm start
+```
+
+Ver [DEPLOYMENT.md](../DEPLOYMENT.md) para ejemplos por plataforma.
 
 ## Conexion esperada con el Backend
 

@@ -28,6 +28,12 @@ export function createStaticServer() {
   return createServer(async (req, res) => {
     try {
       const requestedPath = safePath(req.url || '/');
+
+      if (requestedPath === '/config.js') {
+        sendRuntimeConfig(res);
+        return;
+      }
+
       const filePath = await resolveStaticPath(requestedPath);
 
       if (!filePath) {
@@ -58,7 +64,10 @@ if (fileURLToPath(import.meta.url) === resolve(process.argv[1] || '')) {
 function safePath(url) {
   const pathname = new URL(url, 'http://localhost').pathname;
   const decodedPath = decodeURIComponent(pathname);
-  const normalizedPath = normalize(decodedPath).replace(/^(\.\.[/\\])+/, '');
+  const normalizedPath = normalize(decodedPath)
+    .replace(/\\/g, '/')
+    .replace(/^(\.\.[/\\])+/, '');
+
   return normalizedPath === '/' ? '/index.html' : normalizedPath;
 }
 
@@ -80,4 +89,35 @@ async function resolveStaticPath(requestedPath) {
 function sendText(res, statusCode, message) {
   res.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end(message);
+}
+
+function sendRuntimeConfig(res) {
+  const config = pickRuntimeConfig();
+
+  res.writeHead(200, {
+    'Content-Type': 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  res.end(`window.__ROBOTCAR_CONFIG__ = ${JSON.stringify(config)};`);
+}
+
+function pickRuntimeConfig() {
+  const config = {};
+  const apiBaseUrl = process.env.VITE_API_BASE_URL || process.env.PUBLIC_API_BASE_URL;
+  const socketUrl = process.env.VITE_SOCKET_URL || process.env.PUBLIC_SOCKET_URL;
+  const apiToken = process.env.VITE_API_TOKEN || process.env.PUBLIC_API_TOKEN;
+
+  if (apiBaseUrl) {
+    config.apiBaseUrl = apiBaseUrl;
+  }
+
+  if (socketUrl) {
+    config.socketUrl = socketUrl;
+  }
+
+  if (apiToken) {
+    config.apiToken = apiToken;
+  }
+
+  return config;
 }

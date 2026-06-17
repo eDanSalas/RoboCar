@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
+import { config } from '../config/runtimeConfig.js';
 
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+export const SOCKET_URL = config.socketUrl;
 
 export function createSocketClient() {
   return io(SOCKET_URL, {

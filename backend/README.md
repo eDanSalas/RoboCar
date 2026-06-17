@@ -59,6 +59,7 @@ http://192.168.1.50:3000
 
 ```text
 PORT=3000
+HOST=0.0.0.0
 FRONTEND_ORIGIN=http://localhost:5173
 DEVICE_ID=carrito-001
 DEVICE_TOKEN=change_me
@@ -67,16 +68,16 @@ COMMAND_TTL_MS=2000
 MAX_FRAME_SIZE_MB=2
 ```
 
-El backend escucha en `0.0.0.0` por defecto. En Heroku no configures `PORT`; Heroku lo asigna automaticamente. `FRONTEND_ORIGIN` acepta varios origenes separados por coma. Para desarrollo rapido tambien puedes usar `FRONTEND_ORIGIN=*`, aunque para pruebas reales conviene listar el origen exacto del Front.
+El backend escucha en `0.0.0.0` por defecto. En produccion, el host suele asignar `PORT` automaticamente. `FRONTEND_ORIGIN` acepta varios origenes separados por coma. Para desarrollo rapido tambien puedes usar `FRONTEND_ORIGIN=*`, aunque para pruebas reales conviene listar el origen exacto del Front.
 
-## Heroku
+## Deploy
 
-Este backend incluye `Procfile` y esta listo para desplegarse como app Node.js en Heroku. En Heroku usa Config Vars en lugar de `.env`.
+Este backend esta listo para desplegarse como app Node.js en Heroku, Railway, Render, Fly.io, VPS u otro host. Usa variables del host en lugar de `.env`.
 
 Variables recomendadas:
 
 ```text
-FRONTEND_ORIGIN=https://robotcar-frontend.herokuapp.com
+FRONTEND_ORIGIN=https://tu-frontend.com
 DEVICE_ID=carrito-001
 DEVICE_TOKEN=tu_token_del_dispositivo
 API_TOKEN=tu_token_del_front
@@ -84,11 +85,14 @@ COMMAND_TTL_MS=2000
 MAX_FRAME_SIZE_MB=2
 ```
 
-Despliegue desde el monorepo:
+Comandos genericos:
 
-```bash
-git subtree push --prefix backend heroku-backend main
+```text
+Build command: npm install
+Start command: npm start
 ```
+
+Ver [DEPLOYMENT.md](../DEPLOYMENT.md) para ejemplos por plataforma.
 
 ## Acceso desde red local
 
