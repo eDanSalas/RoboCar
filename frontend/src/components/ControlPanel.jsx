@@ -1,4 +1,9 @@
 import {
+  useEffect,
+  useRef,
+  useState
+} from 'react';
+import {
   ArrowLeft,
   ArrowRight,
   ChevronsDown,
@@ -15,7 +20,62 @@ const CONTROLS = [
   { label: 'Reversa', command: 'backward', icon: ChevronsDown, tone: 'accent', wide: true }
 ];
 
-function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand }) {
+const HELD_BUTTON_INTERVAL_MS = 300;
+
+function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeCommands }) {
+  const [activePointerCommand, setActivePointerCommand] = useState('');
+  const pointerTimerRef = useRef(null);
+  const ignoreNextClickRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (pointerTimerRef.current) {
+        window.clearInterval(pointerTimerRef.current);
+        pointerTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  function startPointerHold(command, event) {
+    if (command === 'stop') {
+      return;
+    }
+
+    event.preventDefault();
+    ignoreNextClickRef.current = true;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    stopPointerHold();
+    setActivePointerCommand(command);
+    onCommand(command, { immediate: true });
+
+    pointerTimerRef.current = window.setInterval(() => {
+      onCommand(command, { immediate: true });
+    }, HELD_BUTTON_INTERVAL_MS);
+  }
+
+  function stopPointerHold() {
+    if (pointerTimerRef.current) {
+      window.clearInterval(pointerTimerRef.current);
+      pointerTimerRef.current = null;
+    }
+
+    setActivePointerCommand('');
+  }
+
+  function cancelPointerHold() {
+    ignoreNextClickRef.current = false;
+    stopPointerHold();
+  }
+
+  function handleClick(command) {
+    if (ignoreNextClickRef.current) {
+      ignoreNextClickRef.current = false;
+      return;
+    }
+
+    onCommand(command, { immediate: command === 'stop' });
+  }
+
   return (
     <section className="panel control-panel" aria-label="Motor control">
       <div className="panel-title">
@@ -43,18 +103,28 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand }) {
       </div>
 
       <div className="control-grid">
-        {CONTROLS.map(({ label, command, icon: Icon, tone, wide }) => (
-          <button
-            key={command}
-            type="button"
-            className={`cyber-button ${tone}${wide ? ' wide' : ''}`}
-            onClick={() => onCommand(command, { immediate: command === 'stop' })}
-            title={label}
-          >
-            <Icon size={20} />
-            <span>{pendingCommand === command ? 'Enviando...' : label}</span>
-          </button>
-        ))}
+        {CONTROLS.map(({ label, command, icon: Icon, tone, wide }) => {
+          const isActive = activePointerCommand === command || activeCommands?.has(command);
+          const showPending = pendingCommand === command && !isActive;
+
+          return (
+            <button
+              key={command}
+              type="button"
+              className={`cyber-button ${tone}${wide ? ' wide' : ''}${isActive ? ' active' : ''}`}
+              onClick={() => handleClick(command)}
+              onPointerDown={(event) => startPointerHold(command, event)}
+              onPointerUp={stopPointerHold}
+              onPointerCancel={cancelPointerHold}
+              onLostPointerCapture={stopPointerHold}
+              aria-pressed={isActive}
+              title={label}
+            >
+              <Icon size={20} />
+              <span>{showPending ? 'Enviando...' : label}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

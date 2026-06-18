@@ -8,7 +8,7 @@ const VALID_COMMANDS = new Set([
 ]);
 
 const DEFAULT_SPEED = 180;
-const TURN_INNER_SPEED_RATIO = 0.72;
+const TURN_INNER_SPEED_RATIO = 0.6;
 
 let lastCommand = null;
 let lastDeviceStatus = null;

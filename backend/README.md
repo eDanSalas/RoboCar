@@ -148,8 +148,8 @@ Conversion enviada a la ESP32:
 | `backward` | `-speed` | `-speed` | `drive` |
 | `stop` | `0` | `0` | `drive` |
 | `brake` | `0` | `0` | `brake` |
-| `left` | `speed` | `speed * 0.72` | `drive` |
-| `right` | `speed * 0.72` | `speed` | `drive` |
+| `left` | `speed` | `speed * 0.6` | `drive` |
+| `right` | `speed * 0.6` | `speed` | `drive` |
 
 Para `left` y `right`, el body puede incluir `direction` con `forward` o `backward`. Si `direction` es `backward`, las velocidades del giro se envian en negativo.
 

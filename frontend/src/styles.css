@@ -288,6 +288,14 @@ input[type="range"] {
   transform: translateY(0);
 }
 
+.cyber-button.active,
+.cyber-button[aria-pressed="true"] {
+  border-color: var(--line);
+  color: var(--line);
+  box-shadow: 0 0 20px rgba(29, 255, 122, 0.28), inset 0 0 18px rgba(29, 255, 122, 0.12);
+  transform: translateY(1px);
+}
+
 .cyber-button.danger {
   border-color: rgba(255, 77, 109, 0.52);
   color: #ffd9e1;
@@ -308,6 +316,13 @@ input[type="range"] {
   border-color: var(--cyan);
   color: var(--cyan);
   box-shadow: 0 0 18px rgba(82, 247, 255, 0.18);
+}
+
+.cyber-button.accent.active,
+.cyber-button.accent[aria-pressed="true"] {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 20px rgba(82, 247, 255, 0.24), inset 0 0 18px rgba(82, 247, 255, 0.1);
 }
 
 .cyber-button.wide {

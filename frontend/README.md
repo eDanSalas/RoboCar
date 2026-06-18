@@ -128,7 +128,7 @@ D              -> right
 
 La velocidad por defecto es `180` y se puede ajustar con el slider de `0` a `255`.
 
-Mientras una tecla de movimiento se mantiene presionada, el Front vuelve a enviar el comando cada 300 ms para mantener vivo el ultimo comando del backend. El comando `stop` se envia solo al presionar el boton `Stop`.
+Mientras una tecla de movimiento o un boton de movimiento se mantiene presionado, el Front vuelve a enviar el comando cada 300 ms para mantener vivo el ultimo comando del backend. El comando `stop` se envia solo al presionar el boton `Stop`.
 
 Puedes combinar `W` o `S` con `A` o `D` para girar suavemente mientras avanza o va en reversa.
 

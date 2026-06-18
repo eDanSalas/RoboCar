@@ -29,6 +29,7 @@ function App() {
   const [gps, setGps] = useState({ available: false, valid: false });
   const [error, setError] = useState('');
   const [pendingCommand, setPendingCommand] = useState('');
+  const [activeControls, setActiveControls] = useState(() => new Set());
 
   const lastRequestRef = useRef({ command: '', at: 0 });
   const activeKeyboardKeysRef = useRef(new Set());
@@ -48,6 +49,20 @@ function App() {
     } catch (gpsError) {
       setError(gpsError.message);
     }
+  }, []);
+
+  const setControlActive = useCallback((command, active) => {
+    setActiveControls((current) => {
+      const next = new Set(current);
+
+      if (active) {
+        next.add(command);
+      } else {
+        next.delete(command);
+      }
+
+      return next;
+    });
   }, []);
 
   const dispatchCommand = useCallback(async (command, options = {}) => {
@@ -221,6 +236,18 @@ function App() {
       keyboardTimerRef.current = null;
     }
 
+    function resetActiveKeyboardControls() {
+      activeKeyboardKeysRef.current.clear();
+      lastDriveKeyRef.current = '';
+      lastTurnKeyRef.current = '';
+      setActiveControls(new Set());
+
+      if (keyboardTimerRef.current) {
+        window.clearInterval(keyboardTimerRef.current);
+        keyboardTimerRef.current = null;
+      }
+    }
+
     function handleKeyDown(event) {
       const key = event.key.toLowerCase();
       const keyAction = KEYBOARD_COMMANDS[key];
@@ -236,6 +263,7 @@ function App() {
       }
 
       activeKeyboardKeysRef.current.add(key);
+      setControlActive(keyAction.command, true);
 
       if (keyAction.axis === 'drive') {
         lastDriveKeyRef.current = key;
@@ -258,6 +286,7 @@ function App() {
       }
 
       activeKeyboardKeysRef.current.delete(key);
+      setControlActive(keyAction.command, false);
 
       if (keyAction.axis === 'drive' && lastDriveKeyRef.current === key) {
         lastDriveKeyRef.current = findActiveKey(activeKeyboardKeysRef.current, ['w', 's']);
@@ -276,17 +305,19 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', resetActiveKeyboardControls);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', resetActiveKeyboardControls);
 
       if (keyboardTimerRef.current) {
         window.clearInterval(keyboardTimerRef.current);
         keyboardTimerRef.current = null;
       }
     };
-  }, [dispatchCommand]);
+  }, [dispatchCommand, setControlActive]);
 
   return (
     <main className="app-shell">
@@ -301,6 +332,7 @@ function App() {
             onSpeedChange={setSpeed}
             onCommand={dispatchCommand}
             pendingCommand={pendingCommand}
+            activeCommands={activeControls}
           />
           <GpsPanel gps={gps} />
           <StatusPanel
