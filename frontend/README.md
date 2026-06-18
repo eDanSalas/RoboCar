@@ -120,12 +120,12 @@ El Front envia comandos por HTTP y recibe actualizaciones en tiempo real por soc
 ## Teclas de control
 
 ```text
+W              -> forward
 A              -> forward
 S              -> stop
+Flecha abajo   -> backward
 Flecha izquierda -> left
 Flecha derecha   -> right
-Q              -> zero_left
-E              -> zero_right
 ```
 
 La velocidad por defecto es `180` y se puede ajustar con el slider de `0` a `255`.

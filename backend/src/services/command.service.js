@@ -4,9 +4,7 @@ const VALID_COMMANDS = new Set([
   'stop',
   'brake',
   'left',
-  'right',
-  'zero_left',
-  'zero_right'
+  'right'
 ]);
 
 const DEFAULT_SPEED = 180;
@@ -69,14 +67,6 @@ function motorPayload(command, speed) {
     case 'right':
       leftSpeed = speed;
       rightSpeed = Math.round(speed * 0.4);
-      break;
-    case 'zero_left':
-      leftSpeed = -speed;
-      rightSpeed = speed;
-      break;
-    case 'zero_right':
-      leftSpeed = speed;
-      rightSpeed = -speed;
       break;
     case 'stop':
     default:

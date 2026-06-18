@@ -12,10 +12,10 @@ const DEFAULT_SPEED = 180;
 const REPEAT_GUARD_MS = 250;
 
 const KEYBOARD_COMMANDS = {
+  w: 'forward',
   a: 'forward',
   s: 'stop',
-  q: 'zero_left',
-  e: 'zero_right',
+  arrowdown: 'backward',
   arrowleft: 'left',
   arrowright: 'right'
 };

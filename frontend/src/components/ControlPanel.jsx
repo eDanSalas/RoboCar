@@ -1,10 +1,9 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronsDown,
   ChevronsUp,
   Gauge,
-  RotateCcw,
-  RotateCw,
   Square
 } from 'lucide-react';
 
@@ -13,8 +12,7 @@ const CONTROLS = [
   { label: 'Stop', command: 'stop', icon: Square, tone: 'danger' },
   { label: 'Izquierda', command: 'left', icon: ArrowLeft, tone: 'neutral' },
   { label: 'Derecha', command: 'right', icon: ArrowRight, tone: 'neutral' },
-  { label: 'Giro 360 izquierda', command: 'zero_left', icon: RotateCcw, tone: 'accent' },
-  { label: 'Giro 360 derecha', command: 'zero_right', icon: RotateCw, tone: 'accent' }
+  { label: 'Reversa', command: 'backward', icon: ChevronsDown, tone: 'accent', wide: true }
 ];
 
 function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand }) {
@@ -45,11 +43,11 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand }) {
       </div>
 
       <div className="control-grid">
-        {CONTROLS.map(({ label, command, icon: Icon, tone }) => (
+        {CONTROLS.map(({ label, command, icon: Icon, tone, wide }) => (
           <button
             key={command}
             type="button"
-            className={`cyber-button ${tone}`}
+            className={`cyber-button ${tone}${wide ? ' wide' : ''}`}
             onClick={() => onCommand(command, { immediate: command === 'stop' })}
             title={label}
           >

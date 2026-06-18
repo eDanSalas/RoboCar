@@ -136,8 +136,6 @@ stop
 brake
 left
 right
-zero_left
-zero_right
 ```
 
 Si no se envia `speed`, se usa `180`. El valor se limita entre `0` y `255`.
@@ -152,8 +150,6 @@ Conversion enviada a la ESP32:
 | `brake` | `0` | `0` | `brake` |
 | `left` | `speed * 0.4` | `speed` | `drive` |
 | `right` | `speed` | `speed * 0.4` | `drive` |
-| `zero_left` | `-speed` | `speed` | `drive` |
-| `zero_right` | `speed` | `-speed` | `drive` |
 
 ## Endpoints
 
