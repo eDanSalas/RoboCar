@@ -2,14 +2,20 @@ import { config } from '../config/runtimeConfig.js';
 
 export const API_BASE_URL = config.apiBaseUrl;
 
-export async function sendCommand({ command, speed }) {
+export async function sendCommand({ command, speed, direction }) {
+  const body = { command, speed };
+
+  if (direction) {
+    body.direction = direction;
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/commands`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${config.apiToken}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ command, speed })
+    body: JSON.stringify(body)
   });
 
   const payload = await readJson(response);

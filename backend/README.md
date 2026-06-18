@@ -148,8 +148,10 @@ Conversion enviada a la ESP32:
 | `backward` | `-speed` | `-speed` | `drive` |
 | `stop` | `0` | `0` | `drive` |
 | `brake` | `0` | `0` | `brake` |
-| `left` | `speed * 0.4` | `speed` | `drive` |
-| `right` | `speed` | `speed * 0.4` | `drive` |
+| `left` | `speed` | `speed * 0.72` | `drive` |
+| `right` | `speed * 0.72` | `speed` | `drive` |
+
+Para `left` y `right`, el body puede incluir `direction` con `forward` o `backward`. Si `direction` es `backward`, las velocidades del giro se envian en negativo.
 
 ## Endpoints
 
@@ -179,6 +181,16 @@ Body:
 {
   "command": "forward",
   "speed": 180
+}
+```
+
+Para giros combinados con avance o reversa:
+
+```json
+{
+  "command": "left",
+  "speed": 180,
+  "direction": "backward"
 }
 ```
 

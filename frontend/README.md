@@ -121,16 +121,16 @@ El Front envia comandos por HTTP y recibe actualizaciones en tiempo real por soc
 
 ```text
 W              -> forward
-A              -> forward
-S              -> stop
-Flecha abajo   -> backward
-Flecha izquierda -> left
-Flecha derecha   -> right
+A              -> left
+S              -> backward
+D              -> right
 ```
 
 La velocidad por defecto es `180` y se puede ajustar con el slider de `0` a `255`.
 
-Para evitar peticiones repetidas, el Front ignora eventos repetidos cuando una tecla se mantiene presionada. El comando `stop` se envia de inmediato al presionar el boton o la tecla `S`.
+Mientras una tecla de movimiento se mantiene presionada, el Front vuelve a enviar el comando cada 300 ms para mantener vivo el ultimo comando del backend. El comando `stop` se envia solo al presionar el boton `Stop`.
+
+Puedes combinar `W` o `S` con `A` o `D` para girar suavemente mientras avanza o va en reversa.
 
 ## Interfaz
 

@@ -10,14 +10,13 @@ import { createSocketClient } from './socket/socketClient.js';
 
 const DEFAULT_SPEED = 180;
 const REPEAT_GUARD_MS = 250;
+const HELD_COMMAND_INTERVAL_MS = 300;
 
 const KEYBOARD_COMMANDS = {
-  w: 'forward',
-  a: 'forward',
-  s: 'stop',
-  arrowdown: 'backward',
-  arrowleft: 'left',
-  arrowright: 'right'
+  w: { axis: 'drive', command: 'forward' },
+  s: { axis: 'drive', command: 'backward' },
+  a: { axis: 'turn', command: 'left' },
+  d: { axis: 'turn', command: 'right' }
 };
 
 function App() {
@@ -32,7 +31,11 @@ function App() {
   const [pendingCommand, setPendingCommand] = useState('');
 
   const lastRequestRef = useRef({ command: '', at: 0 });
-  const pressedKeysRef = useRef(new Set());
+  const activeKeyboardKeysRef = useRef(new Set());
+  const lastDriveKeyRef = useRef('');
+  const lastTurnKeyRef = useRef('');
+  const keyboardTimerRef = useRef(null);
+  const keyboardRequestActiveRef = useRef(false);
 
   const refreshLatestFrame = useCallback(() => {
     setCameraImageSrc(`${API_BASE_URL}/api/camera/latest.jpg?ts=${Date.now()}`);
@@ -53,17 +56,22 @@ function App() {
     const immediate = options.immediate || isStop;
     const selectedSpeed = isStop ? 0 : speed;
     const lastRequest = lastRequestRef.current;
+    const requestKey = `${command}:${options.direction || ''}`;
 
-    if (!immediate && lastRequest.command === command && now - lastRequest.at < REPEAT_GUARD_MS) {
+    if (!immediate && lastRequest.command === requestKey && now - lastRequest.at < REPEAT_GUARD_MS) {
       return;
     }
 
-    lastRequestRef.current = { command, at: now };
+    lastRequestRef.current = { command: requestKey, at: now };
     setPendingCommand(command);
     setError('');
 
     try {
-      const payload = await sendCommand({ command, speed: selectedSpeed });
+      const payload = await sendCommand({
+        command,
+        speed: selectedSpeed,
+        direction: options.direction
+      });
       setLastCommand(payload.command);
     } catch (requestError) {
       setError(requestError.message);
@@ -140,26 +148,130 @@ function App() {
   }, [refreshGps, refreshLatestFrame]);
 
   useEffect(() => {
+    function buildActiveKeyboardCommand() {
+      const activeKeys = activeKeyboardKeysRef.current;
+      const driveKey = activeKeys.has(lastDriveKeyRef.current)
+        ? lastDriveKeyRef.current
+        : findActiveKey(activeKeys, ['w', 's']);
+      const turnKey = activeKeys.has(lastTurnKeyRef.current)
+        ? lastTurnKeyRef.current
+        : findActiveKey(activeKeys, ['a', 'd']);
+      const driveCommand = driveKey ? KEYBOARD_COMMANDS[driveKey].command : '';
+      const turnCommand = turnKey ? KEYBOARD_COMMANDS[turnKey].command : '';
+
+      lastDriveKeyRef.current = driveKey;
+      lastTurnKeyRef.current = turnKey;
+
+      if (turnCommand) {
+        return {
+          command: turnCommand,
+          direction: driveCommand === 'backward' ? 'backward' : 'forward'
+        };
+      }
+
+      if (driveCommand) {
+        return {
+          command: driveCommand,
+          direction: ''
+        };
+      }
+
+      return null;
+    }
+
+    async function sendActiveKeyboardCommand() {
+      if (keyboardRequestActiveRef.current) {
+        return;
+      }
+
+      const activeCommand = buildActiveKeyboardCommand();
+
+      if (!activeCommand) {
+        return;
+      }
+
+      keyboardRequestActiveRef.current = true;
+
+      try {
+        await dispatchCommand(activeCommand.command, {
+          direction: activeCommand.direction,
+          immediate: true
+        });
+      } finally {
+        keyboardRequestActiveRef.current = false;
+      }
+    }
+
+    function startKeyboardTimer() {
+      if (keyboardTimerRef.current) {
+        return;
+      }
+
+      keyboardTimerRef.current = window.setInterval(() => {
+        sendActiveKeyboardCommand();
+      }, HELD_COMMAND_INTERVAL_MS);
+    }
+
+    function stopKeyboardTimerIfIdle() {
+      if (activeKeyboardKeysRef.current.size > 0 || !keyboardTimerRef.current) {
+        return;
+      }
+
+      window.clearInterval(keyboardTimerRef.current);
+      keyboardTimerRef.current = null;
+    }
+
     function handleKeyDown(event) {
       const key = event.key.toLowerCase();
-      const command = KEYBOARD_COMMANDS[key];
+      const keyAction = KEYBOARD_COMMANDS[key];
 
-      if (!command || isTypingTarget(event.target)) {
+      if (!keyAction || isTypingTarget(event.target)) {
         return;
       }
 
       event.preventDefault();
 
-      if (event.repeat || pressedKeysRef.current.has(event.code)) {
+      if (event.repeat || activeKeyboardKeysRef.current.has(key)) {
         return;
       }
 
-      pressedKeysRef.current.add(event.code);
-      dispatchCommand(command, { immediate: command === 'stop' });
+      activeKeyboardKeysRef.current.add(key);
+
+      if (keyAction.axis === 'drive') {
+        lastDriveKeyRef.current = key;
+      }
+
+      if (keyAction.axis === 'turn') {
+        lastTurnKeyRef.current = key;
+      }
+
+      sendActiveKeyboardCommand();
+      startKeyboardTimer();
     }
 
     function handleKeyUp(event) {
-      pressedKeysRef.current.delete(event.code);
+      const key = event.key.toLowerCase();
+      const keyAction = KEYBOARD_COMMANDS[key];
+
+      if (!keyAction) {
+        return;
+      }
+
+      activeKeyboardKeysRef.current.delete(key);
+
+      if (keyAction.axis === 'drive' && lastDriveKeyRef.current === key) {
+        lastDriveKeyRef.current = findActiveKey(activeKeyboardKeysRef.current, ['w', 's']);
+      }
+
+      if (keyAction.axis === 'turn' && lastTurnKeyRef.current === key) {
+        lastTurnKeyRef.current = findActiveKey(activeKeyboardKeysRef.current, ['a', 'd']);
+      }
+
+      if (activeKeyboardKeysRef.current.size > 0) {
+        sendActiveKeyboardCommand();
+      }
+
+      stopKeyboardTimerIfIdle();
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -168,6 +280,11 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+
+      if (keyboardTimerRef.current) {
+        window.clearInterval(keyboardTimerRef.current);
+        keyboardTimerRef.current = null;
+      }
     };
   }, [dispatchCommand]);
 
@@ -206,6 +323,10 @@ function isTypingTarget(target) {
 
   const tagName = target.tagName;
   return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable;
+}
+
+function findActiveKey(activeKeys, keys) {
+  return keys.find((key) => activeKeys.has(key)) || '';
 }
 
 export default App;

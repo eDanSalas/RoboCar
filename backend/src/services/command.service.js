@@ -8,6 +8,7 @@ const VALID_COMMANDS = new Set([
 ]);
 
 const DEFAULT_SPEED = 180;
+const TURN_INNER_SPEED_RATIO = 0.72;
 
 let lastCommand = null;
 let lastDeviceStatus = null;
@@ -43,10 +44,31 @@ function assertValidCommand(command) {
   }
 }
 
-function motorPayload(command, speed) {
+function parseTurnDirection(command, direction) {
+  if (command !== 'left' && command !== 'right') {
+    return null;
+  }
+
+  if (direction === undefined || direction === null || direction === '') {
+    return 'forward';
+  }
+
+  if (direction === 'forward' || direction === 'backward') {
+    return direction;
+  }
+
+  const error = new Error('direction must be forward or backward.');
+  error.statusCode = 400;
+  error.code = 'INVALID_DIRECTION';
+  throw error;
+}
+
+function motorPayload(command, speed, direction = null) {
   let leftSpeed = 0;
   let rightSpeed = 0;
   let mode = 'drive';
+  const turnSpeed = Math.round(speed * TURN_INNER_SPEED_RATIO);
+  const directionMultiplier = direction === 'backward' ? -1 : 1;
 
   switch (command) {
     case 'forward':
@@ -61,25 +83,31 @@ function motorPayload(command, speed) {
       mode = 'brake';
       break;
     case 'left':
-      leftSpeed = Math.round(speed * 0.4);
-      rightSpeed = speed;
+      leftSpeed = directionMultiplier * speed;
+      rightSpeed = directionMultiplier * turnSpeed;
       break;
     case 'right':
-      leftSpeed = speed;
-      rightSpeed = Math.round(speed * 0.4);
+      leftSpeed = directionMultiplier * turnSpeed;
+      rightSpeed = directionMultiplier * speed;
       break;
     case 'stop':
     default:
       break;
   }
 
-  return {
+  const motorCommand = {
     command,
     speed,
     leftSpeed,
     rightSpeed,
     mode
   };
+
+  if (direction) {
+    motorCommand.direction = direction;
+  }
+
+  return motorCommand;
 }
 
 function buildStopCommand(reason = 'idle') {
@@ -99,11 +127,12 @@ function saveCommand(payload) {
   assertValidCommand(command);
 
   const speed = parseSpeed(payload.speed);
+  const direction = parseTurnDirection(command, payload.direction);
   const now = Date.now();
   const ttlMs = getCommandTtlMs();
 
   lastCommand = {
-    ...motorPayload(command, speed),
+    ...motorPayload(command, speed, direction),
     active: true,
     reason: 'latest_command',
     createdAt: new Date(now).toISOString(),
