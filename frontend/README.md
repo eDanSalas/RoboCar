@@ -48,11 +48,13 @@ npm start
 VITE_API_BASE_URL=http://localhost:3000
 VITE_SOCKET_URL=http://localhost:3000
 VITE_API_TOKEN=change_me
+VITE_DEVICE_ID=carrito-001
 ```
 
 - `VITE_API_BASE_URL`: URL base del backend Express.
 - `VITE_SOCKET_URL`: URL del servidor socket.io.
 - `VITE_API_TOKEN`: token usado en `Authorization: Bearer VITE_API_TOKEN` para enviar comandos.
+- `VITE_DEVICE_ID`: dispositivo consultado por el panel GPS.
 
 El token debe coincidir con `API_TOKEN` en el `.env` del backend.
 
@@ -64,6 +66,7 @@ En produccion, el servidor `npm start` genera `/config.js` en runtime. Puedes us
 PUBLIC_API_BASE_URL=https://tu-backend.com
 PUBLIC_SOCKET_URL=https://tu-backend.com
 PUBLIC_API_TOKEN=tu_api_token
+PUBLIC_DEVICE_ID=carrito-001
 ```
 
 Esto permite cambiar la URL del backend o token desde variables del host sin reconstruir el bundle.
@@ -78,6 +81,7 @@ Variables recomendadas de produccion:
 PUBLIC_API_BASE_URL=https://tu-backend.com
 PUBLIC_SOCKET_URL=https://tu-backend.com
 PUBLIC_API_TOKEN=tu_api_token
+PUBLIC_DEVICE_ID=carrito-001
 ```
 
 Comandos genericos:
@@ -98,6 +102,7 @@ Rutas usadas:
 ```text
 POST /api/commands
 GET /api/camera/latest.jpg
+GET /api/devices/:deviceId/gps
 ```
 
 Eventos socket.io escuchados:
@@ -105,6 +110,7 @@ Eventos socket.io escuchados:
 ```text
 car:command
 car:status
+gps:update
 camera:frame
 camera:info
 ```
@@ -133,6 +139,7 @@ La pantalla principal incluye:
 - `SMART CAR CONTROL PANEL`
 - `CAMERA FEED`
 - `MOTOR CONTROL`
+- `GPS`
 - `DEVICE STATUS`
 - Estado de conexion socket online/offline
 - Ultimo comando enviado, velocidad, `leftSpeed`, `rightSpeed`, modo y timestamp

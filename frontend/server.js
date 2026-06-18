@@ -106,6 +106,7 @@ function pickRuntimeConfig() {
   const apiBaseUrl = process.env.VITE_API_BASE_URL || process.env.PUBLIC_API_BASE_URL;
   const socketUrl = process.env.VITE_SOCKET_URL || process.env.PUBLIC_SOCKET_URL;
   const apiToken = process.env.VITE_API_TOKEN || process.env.PUBLIC_API_TOKEN;
+  const deviceId = process.env.VITE_DEVICE_ID || process.env.PUBLIC_DEVICE_ID;
 
   if (apiBaseUrl) {
     config.apiBaseUrl = apiBaseUrl;
@@ -117,6 +118,10 @@ function pickRuntimeConfig() {
 
   if (apiToken) {
     config.apiToken = apiToken;
+  }
+
+  if (deviceId) {
+    config.deviceId = deviceId;
   }
 
   return config;

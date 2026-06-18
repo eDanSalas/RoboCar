@@ -213,6 +213,7 @@ input {
 }
 
 .control-panel,
+.gps-panel,
 .status-panel {
   overflow: hidden;
 }
@@ -315,6 +316,99 @@ input[type="range"] {
   gap: 1px;
   padding: 1px;
   background: var(--line-dim);
+}
+
+.gps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  padding: 1px;
+  background: var(--line-dim);
+}
+
+.gps-row {
+  display: grid;
+  gap: 5px;
+  min-height: 58px;
+  padding: 10px 12px;
+  background: rgba(5, 16, 9, 0.98);
+}
+
+.gps-row span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.gps-row strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.gps-row.ok strong {
+  color: var(--line);
+}
+
+.gps-row.warn strong {
+  color: var(--amber);
+}
+
+.gps-map {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 230px;
+  border-top: 1px solid var(--line-dim);
+  background:
+    linear-gradient(90deg, rgba(82, 247, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(82, 247, 255, 0.07) 1px, transparent 1px),
+    rgba(1, 4, 2, 0.84);
+  background-size: 24px 24px;
+}
+
+.gps-map iframe {
+  width: 100%;
+  height: 230px;
+  border: 0;
+  filter: saturate(0.75) contrast(1.05);
+}
+
+.map-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 160px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.gps-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line-dim);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.gps-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.gps-footer a:hover {
+  color: var(--line);
 }
 
 .status-row {
@@ -424,6 +518,7 @@ input[type="range"] {
 
   .camera-meta,
   .control-grid,
+  .gps-grid,
   .status-grid {
     grid-template-columns: 1fr;
   }

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Header from './components/Header.jsx';
 import CameraFeed from './components/CameraFeed.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
+import GpsPanel from './components/GpsPanel.jsx';
 import StatusPanel from './components/StatusPanel.jsx';
 import { API_BASE_URL, sendCommand } from './api/commandApi.js';
+import { getLatestGps } from './api/gpsApi.js';
 import { createSocketClient } from './socket/socketClient.js';
 
 const DEFAULT_SPEED = 180;
@@ -25,6 +27,7 @@ function App() {
   const [socketOnline, setSocketOnline] = useState(false);
   const [cameraImageSrc, setCameraImageSrc] = useState('');
   const [cameraInfo, setCameraInfo] = useState({ available: false });
+  const [gps, setGps] = useState({ available: false, valid: false });
   const [error, setError] = useState('');
   const [pendingCommand, setPendingCommand] = useState('');
 
@@ -33,6 +36,15 @@ function App() {
 
   const refreshLatestFrame = useCallback(() => {
     setCameraImageSrc(`${API_BASE_URL}/api/camera/latest.jpg?ts=${Date.now()}`);
+  }, []);
+
+  const refreshGps = useCallback(async () => {
+    try {
+      const payload = await getLatestGps();
+      setGps(payload.gps);
+    } catch (gpsError) {
+      setError(gpsError.message);
+    }
   }, []);
 
   const dispatchCommand = useCallback(async (command, options = {}) => {
@@ -81,7 +93,18 @@ function App() {
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
     socket.on('car:command', setLastCommand);
-    socket.on('car:status', setDeviceStatus);
+    socket.on('car:status', (status) => {
+      setDeviceStatus(status);
+
+      if (status?.status?.gps) {
+        setGps({
+          available: true,
+          ...status.status.gps,
+          receivedAt: status.receivedAt
+        });
+      }
+    });
+    socket.on('gps:update', setGps);
     socket.on('camera:info', (info) => {
       setCameraInfo(info);
 
@@ -102,14 +125,19 @@ function App() {
     return () => {
       socket.disconnect();
     };
-  }, [refreshLatestFrame]);
+  }, [refreshGps, refreshLatestFrame]);
 
   useEffect(() => {
     refreshLatestFrame();
+    refreshGps();
     const refreshTimer = window.setInterval(refreshLatestFrame, 5000);
+    const gpsTimer = window.setInterval(refreshGps, 10000);
 
-    return () => window.clearInterval(refreshTimer);
-  }, [refreshLatestFrame]);
+    return () => {
+      window.clearInterval(refreshTimer);
+      window.clearInterval(gpsTimer);
+    };
+  }, [refreshGps, refreshLatestFrame]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -157,6 +185,7 @@ function App() {
             onCommand={dispatchCommand}
             pendingCommand={pendingCommand}
           />
+          <GpsPanel gps={gps} />
           <StatusPanel
             lastCommand={lastCommand}
             speed={speed}

@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const { getFrameInfo } = require('./camera.service');
 const { getCorsOptions } = require('./cors.service');
+const { getGps } = require('./gps.service');
 
 let io = null;
 
@@ -11,6 +12,7 @@ function initializeSocket(server) {
 
   io.on('connection', (socket) => {
     socket.emit('camera:info', getFrameInfo());
+    socket.emit('gps:update', getGps());
   });
 
   return io;

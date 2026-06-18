@@ -124,7 +124,8 @@ http://192.168.1.50:3000/api/camera/frame
 3. La ESP32 principal consulta `GET /api/devices/:deviceId/command`.
 4. Si el comando expiro por `COMMAND_TTL_MS`, el backend responde `stop`.
 5. La ESP32-CAM sube JPEGs a `POST /api/camera/frame`.
-6. El Front consulta `GET /api/camera/latest.jpg` o escucha eventos socket.io.
+6. La ESP32 puede reportar GPS dentro de `/status` o en `POST /api/devices/:deviceId/gps`.
+7. El Front consulta `GET /api/camera/latest.jpg` o escucha eventos socket.io.
 
 ## Comandos validos
 
@@ -269,6 +270,44 @@ curl -X POST http://localhost:3000/api/devices/carrito-001/status \
   -d "{\"battery\":7.4,\"rssi\":-70,\"network\":\"lte\"}"
 ```
 
+Si el body incluye un objeto `gps`, el backend lo guarda y emite `gps:update`:
+
+```json
+{
+  "state": "online",
+  "gps": {
+    "valid": true,
+    "lat": 19.432608,
+    "lng": -99.133209,
+    "satellites": 8
+  }
+}
+```
+
+### Enviar GPS desde la ESP32 principal
+
+```http
+POST /api/devices/:deviceId/gps
+Authorization: Bearer DEVICE_TOKEN
+Content-Type: application/json
+```
+
+Ejemplo:
+
+```bash
+curl -X POST http://localhost:3000/api/devices/carrito-001/gps \
+  -H "Authorization: Bearer change_me" \
+  -H "Content-Type: application/json" \
+  -d "{\"valid\":true,\"lat\":19.432608,\"lng\":-99.133209,\"satellites\":8,\"hdop\":1.2}"
+```
+
+### Consultar ultimo GPS desde el Front
+
+```http
+GET /api/devices/:deviceId/gps
+Authorization: Bearer API_TOKEN
+```
+
 ### Subir frame desde la ESP32-CAM
 
 ```http
@@ -324,6 +363,7 @@ El Front debe conectarse al backend con socket.io y escuchar:
 ```text
 car:command
 car:status
+gps:update
 camera:frame
 camera:info
 ```
@@ -332,6 +372,7 @@ Payloads principales:
 
 - `car:command`: comando normalizado con `leftSpeed`, `rightSpeed`, `mode`, `createdAt` y `expiresAt`.
 - `car:status`: ultimo estado reportado por la ESP32 principal.
+- `gps:update`: ultima ubicacion GPS normalizada.
 - `camera:frame`: metadatos del frame mas `data` en base64.
 - `camera:info`: metadatos del ultimo frame sin imagen.
 

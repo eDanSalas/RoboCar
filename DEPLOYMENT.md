@@ -31,6 +31,7 @@ Frontend:
 VITE_API_BASE_URL=http://localhost:3000
 VITE_SOCKET_URL=http://localhost:3000
 VITE_API_TOKEN=change_me
+VITE_DEVICE_ID=carrito-001
 ```
 
 En produccion, el frontend tambien acepta estas variables runtime si el host ejecuta `npm start`:
@@ -39,6 +40,7 @@ En produccion, el frontend tambien acepta estas variables runtime si el host eje
 PUBLIC_API_BASE_URL=https://tu-backend.com
 PUBLIC_SOCKET_URL=https://tu-backend.com
 PUBLIC_API_TOKEN=tu_api_token
+PUBLIC_DEVICE_ID=carrito-001
 ```
 
 Tambien puedes usar `VITE_API_BASE_URL`, `VITE_SOCKET_URL` y `VITE_API_TOKEN` en produccion. El servidor del frontend genera `/config.js` en runtime, asi puedes cambiar URLs/tokens desde variables del host sin reconstruir el bundle.
@@ -153,7 +155,8 @@ heroku git:remote -a robotcar-frontend -r heroku-frontend
 heroku config:set -a robotcar-frontend `
   PUBLIC_API_BASE_URL=https://robotcar-backend.herokuapp.com `
   PUBLIC_SOCKET_URL=https://robotcar-backend.herokuapp.com `
-  PUBLIC_API_TOKEN=TU_API_TOKEN
+  PUBLIC_API_TOKEN=TU_API_TOKEN `
+  PUBLIC_DEVICE_ID=carrito-001
 git subtree push --prefix frontend heroku-frontend main
 ```
 
@@ -176,7 +179,7 @@ Frontend:
 Root directory: frontend
 Build command: npm install && npm run build
 Start command: npm start
-Variables: PUBLIC_API_BASE_URL, PUBLIC_SOCKET_URL, PUBLIC_API_TOKEN
+Variables: PUBLIC_API_BASE_URL, PUBLIC_SOCKET_URL, PUBLIC_API_TOKEN, PUBLIC_DEVICE_ID
 ```
 
 ## Firmware

@@ -3,6 +3,7 @@ const {
   getCommandForDevice,
   saveDeviceStatus
 } = require('../services/command.service');
+const { extractGpsPayload, saveGps } = require('../services/gps.service');
 const { emitToFrontend } = require('../services/socket.service');
 
 function createCommand(req, res, next) {
@@ -37,8 +38,14 @@ function getDeviceCommand(req, res, next) {
 function updateDeviceStatus(req, res, next) {
   try {
     const status = saveDeviceStatus(req.params.deviceId, req.body || {});
+    const gpsPayload = extractGpsPayload(req.body || {});
 
     emitToFrontend('car:status', status);
+
+    if (gpsPayload) {
+      const gps = saveGps(req.params.deviceId, gpsPayload, 'status_payload');
+      emitToFrontend('gps:update', gps);
+    }
 
     res.json({
       ok: true,
