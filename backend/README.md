@@ -65,6 +65,7 @@ DEVICE_ID=carrito-001
 DEVICE_TOKEN=change_me
 API_TOKEN=change_me
 COMMAND_TTL_MS=2000
+COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
 
@@ -82,6 +83,7 @@ DEVICE_ID=carrito-001
 DEVICE_TOKEN=tu_token_del_dispositivo
 API_TOKEN=tu_token_del_front
 COMMAND_TTL_MS=2000
+COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
 
@@ -120,12 +122,14 @@ http://192.168.1.50:3000/api/camera/frame
 ## Flujo
 
 1. El Front envia comandos a `POST /api/commands`.
-2. El backend guarda el ultimo comando en memoria.
+2. El backend encola los comandos recientes en un buffer corto en memoria.
 3. La ESP32 principal consulta `GET /api/devices/:deviceId/command`.
-4. Si el comando expiro por `COMMAND_TTL_MS`, el backend responde `stop`.
-5. La ESP32-CAM sube JPEGs a `POST /api/camera/frame`.
-6. La ESP32 puede reportar GPS dentro de `/status` o en `POST /api/devices/:deviceId/gps`.
-7. El Front consulta `GET /api/camera/latest.jpg` o escucha eventos socket.io.
+4. En cada polling, el backend entrega el siguiente comando de la cola.
+5. Si la cola queda vacia, el backend repite brevemente el ultimo comando entregado mientras no expire.
+6. Si el comando expiro por `COMMAND_TTL_MS`, el backend responde `stop`.
+7. La ESP32-CAM sube JPEGs a `POST /api/camera/frame`.
+8. La ESP32 puede reportar GPS dentro de `/status` o en `POST /api/devices/:deviceId/gps`.
+9. El Front consulta `GET /api/camera/latest.jpg` o escucha eventos socket.io.
 
 ## Comandos validos
 
@@ -139,6 +143,8 @@ right
 ```
 
 Si no se envia `speed`, se usa `180`. El valor se limita entre `0` y `255`.
+
+Los comandos de movimiento se guardan en una cola en memoria. `COMMAND_QUEUE_MAX` limita el numero maximo de comandos pendientes; si se llena, se conservan los mas recientes. `stop` y `brake` limpian la cola para evitar movimientos pendientes despues de frenar.
 
 Conversion enviada a la ESP32:
 
@@ -230,11 +236,13 @@ Respuesta activa:
     "rightSpeed": 180,
     "mode": "drive",
     "active": true,
-    "reason": "latest_command",
+    "reason": "queued_command",
+    "sequence": 42,
     "createdAt": "2026-06-14T12:00:00.000Z",
     "expiresAt": "2026-06-14T12:00:02.000Z",
     "ttlMs": 2000,
     "deviceId": "carrito-001",
+    "queueLength": 3,
     "serverTime": "2026-06-14T12:00:00.500Z"
   }
 }
@@ -407,3 +415,4 @@ socket.on('camera:frame', (frame) => {
 - La ESP32 principal debe hacer polling a `/api/devices/carrito-001/command`.
 - Usa un intervalo menor que `COMMAND_TTL_MS` para que el carrito no se quede con un comando viejo.
 - Si el backend no recibe comandos nuevos dentro del TTL, responde `stop`.
+- Si `queueLength` crece constantemente, la ESP32 esta consultando mas lento de lo que el Front envia comandos.

@@ -22,6 +22,7 @@ DEVICE_ID=carrito-001
 DEVICE_TOKEN=change_me
 API_TOKEN=change_me
 COMMAND_TTL_MS=2000
+COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
 
@@ -143,6 +144,7 @@ heroku config:set -a robotcar-backend `
   DEVICE_TOKEN=TU_DEVICE_TOKEN `
   API_TOKEN=TU_API_TOKEN `
   COMMAND_TTL_MS=2000 `
+  COMMAND_QUEUE_MAX=30 `
   MAX_FRAME_SIZE_MB=2
 git subtree push --prefix backend heroku-backend main
 ```
@@ -170,7 +172,7 @@ Backend:
 Root directory: backend
 Build command: npm install
 Start command: npm start
-Variables: FRONTEND_ORIGIN, DEVICE_ID, DEVICE_TOKEN, API_TOKEN, COMMAND_TTL_MS, MAX_FRAME_SIZE_MB
+Variables: FRONTEND_ORIGIN, DEVICE_ID, DEVICE_TOKEN, API_TOKEN, COMMAND_TTL_MS, COMMAND_QUEUE_MAX, MAX_FRAME_SIZE_MB
 ```
 
 Frontend:

@@ -9,13 +9,27 @@ const VALID_COMMANDS = new Set([
 
 const DEFAULT_SPEED = 180;
 const TURN_INNER_SPEED_RATIO = 0.6;
+const DEFAULT_COMMAND_QUEUE_MAX = 30;
+const ABSOLUTE_COMMAND_QUEUE_MAX = 200;
 
-let lastCommand = null;
+let commandQueue = [];
+let lastDeliveredCommand = null;
 let lastDeviceStatus = null;
+let commandSequence = 0;
 
 function getCommandTtlMs() {
   const ttl = Number(process.env.COMMAND_TTL_MS || 2000);
   return Number.isFinite(ttl) && ttl > 0 ? ttl : 2000;
+}
+
+function getCommandQueueMax() {
+  const max = Number(process.env.COMMAND_QUEUE_MAX || DEFAULT_COMMAND_QUEUE_MAX);
+
+  if (!Number.isFinite(max) || max <= 0) {
+    return DEFAULT_COMMAND_QUEUE_MAX;
+  }
+
+  return Math.min(Math.trunc(max), ABSOLUTE_COMMAND_QUEUE_MAX);
 }
 
 function parseSpeed(speed) {
@@ -117,6 +131,7 @@ function buildStopCommand(reason = 'idle') {
     reason,
     createdAt: null,
     expiresAt: null,
+    queueLength: commandQueue.length,
     serverTime: new Date().toISOString()
   };
 }
@@ -131,38 +146,87 @@ function saveCommand(payload) {
   const now = Date.now();
   const ttlMs = getCommandTtlMs();
 
-  lastCommand = {
+  const queuedCommand = {
     ...motorPayload(command, speed, direction),
+    sequence: ++commandSequence,
     active: true,
-    reason: 'latest_command',
+    reason: 'queued_command',
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ttlMs).toISOString(),
     ttlMs
   };
 
+  if (command === 'stop' || command === 'brake') {
+    commandQueue = [];
+    lastDeliveredCommand = queuedCommand;
+  } else {
+    purgeExpiredCommands(now);
+    commandQueue.push(queuedCommand);
+    trimCommandQueue();
+  }
+
   return {
-    ...lastCommand,
+    ...queuedCommand,
+    queueLength: commandQueue.length,
     serverTime: new Date().toISOString()
   };
 }
 
 function getCommandForDevice(deviceId) {
-  if (!lastCommand) {
+  const now = Date.now();
+
+  purgeExpiredCommands(now);
+
+  const queuedCommand = commandQueue.shift();
+
+  if (queuedCommand) {
+    lastDeliveredCommand = {
+      ...queuedCommand,
+      reason: 'queued_command'
+    };
+
+    return {
+      ...lastDeliveredCommand,
+      deviceId,
+      queueLength: commandQueue.length,
+      serverTime: new Date(now).toISOString()
+    };
+  }
+
+  if (!lastDeliveredCommand) {
     return buildStopCommand('no_command');
   }
 
-  const now = Date.now();
-  const expiresAt = Date.parse(lastCommand.expiresAt);
+  const expiresAt = Date.parse(lastDeliveredCommand.expiresAt);
 
   if (!Number.isFinite(expiresAt) || expiresAt <= now) {
     return buildStopCommand('expired');
   }
 
   return {
-    ...lastCommand,
+    ...lastDeliveredCommand,
+    reason: 'last_delivered_replay',
     deviceId,
+    queueLength: commandQueue.length,
     serverTime: new Date(now).toISOString()
   };
+}
+
+function purgeExpiredCommands(now = Date.now()) {
+  commandQueue = commandQueue.filter((queuedCommand) => {
+    const expiresAt = Date.parse(queuedCommand.expiresAt);
+    return Number.isFinite(expiresAt) && expiresAt > now;
+  });
+}
+
+function trimCommandQueue() {
+  const max = getCommandQueueMax();
+
+  if (commandQueue.length <= max) {
+    return;
+  }
+
+  commandQueue = commandQueue.slice(commandQueue.length - max);
 }
 
 function saveDeviceStatus(deviceId, payload) {
@@ -184,5 +248,6 @@ module.exports = {
   saveCommand,
   getCommandForDevice,
   saveDeviceStatus,
-  getDeviceStatus
+  getDeviceStatus,
+  getCommandQueueMax
 };
