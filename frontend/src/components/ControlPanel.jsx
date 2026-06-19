@@ -1,7 +1,5 @@
 import {
-  useEffect,
-  useRef,
-  useState
+  useRef
 } from 'react';
 import {
   ArrowLeft,
@@ -20,23 +18,20 @@ const CONTROLS = [
   { label: 'Reversa', command: 'backward', icon: ChevronsDown, tone: 'accent', wide: true }
 ];
 
-const HELD_BUTTON_INTERVAL_MS = 300;
+const CLICK_PULSE_MS = 100;
 
-function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeCommands }) {
-  const [activePointerCommand, setActivePointerCommand] = useState('');
-  const pointerTimerRef = useRef(null);
+function ControlPanel({
+  speed,
+  onSpeedChange,
+  onControlStart,
+  onControlEnd,
+  onStop,
+  pendingCommand,
+  activeCommands
+}) {
   const ignoreNextClickRef = useRef(false);
 
-  useEffect(() => {
-    return () => {
-      if (pointerTimerRef.current) {
-        window.clearInterval(pointerTimerRef.current);
-        pointerTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  function startPointerHold(command, event) {
+  function handlePointerDown(command, event) {
     if (command === 'stop') {
       return;
     }
@@ -44,27 +39,18 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeC
     event.preventDefault();
     ignoreNextClickRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    stopPointerHold();
-    setActivePointerCommand(command);
-    onCommand(command, { immediate: true });
-
-    pointerTimerRef.current = window.setInterval(() => {
-      onCommand(command, { immediate: true });
-    }, HELD_BUTTON_INTERVAL_MS);
+    onControlStart(command);
   }
 
-  function stopPointerHold() {
-    if (pointerTimerRef.current) {
-      window.clearInterval(pointerTimerRef.current);
-      pointerTimerRef.current = null;
+  function handlePointerEnd(command) {
+    if (command !== 'stop') {
+      onControlEnd(command);
     }
-
-    setActivePointerCommand('');
   }
 
-  function cancelPointerHold() {
+  function handlePointerCancel(command) {
     ignoreNextClickRef.current = false;
-    stopPointerHold();
+    handlePointerEnd(command);
   }
 
   function handleClick(command) {
@@ -73,7 +59,13 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeC
       return;
     }
 
-    onCommand(command, { immediate: command === 'stop' });
+    if (command === 'stop') {
+      onStop();
+      return;
+    }
+
+    onControlStart(command);
+    window.setTimeout(() => onControlEnd(command), CLICK_PULSE_MS);
   }
 
   return (
@@ -104,7 +96,7 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeC
 
       <div className="control-grid">
         {CONTROLS.map(({ label, command, icon: Icon, tone, wide }) => {
-          const isActive = activePointerCommand === command || activeCommands?.has(command);
+          const isActive = activeCommands?.has(command);
           const showPending = pendingCommand === command && !isActive;
 
           return (
@@ -113,10 +105,10 @@ function ControlPanel({ speed, onSpeedChange, onCommand, pendingCommand, activeC
               type="button"
               className={`cyber-button ${tone}${wide ? ' wide' : ''}${isActive ? ' active' : ''}`}
               onClick={() => handleClick(command)}
-              onPointerDown={(event) => startPointerHold(command, event)}
-              onPointerUp={stopPointerHold}
-              onPointerCancel={cancelPointerHold}
-              onLostPointerCapture={stopPointerHold}
+              onPointerDown={(event) => handlePointerDown(command, event)}
+              onPointerUp={() => handlePointerEnd(command)}
+              onPointerCancel={() => handlePointerCancel(command)}
+              onLostPointerCapture={() => handlePointerEnd(command)}
               aria-pressed={isActive}
               title={label}
             >

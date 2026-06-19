@@ -2,11 +2,19 @@ import { config } from '../config/runtimeConfig.js';
 
 export const API_BASE_URL = config.apiBaseUrl;
 
-export async function sendCommand({ command, speed, direction }) {
+export async function sendCommand({ command, speed, direction, leftSpeed, rightSpeed }) {
   const body = { command, speed };
 
   if (direction) {
     body.direction = direction;
+  }
+
+  if (leftSpeed !== undefined) {
+    body.leftSpeed = leftSpeed;
+  }
+
+  if (rightSpeed !== undefined) {
+    body.rightSpeed = rightSpeed;
   }
 
   const response = await fetch(`${API_BASE_URL}/api/commands`, {

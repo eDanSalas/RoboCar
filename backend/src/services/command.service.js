@@ -1,4 +1,5 @@
 const VALID_COMMANDS = new Set([
+  'drive',
   'forward',
   'backward',
   'stop',
@@ -18,8 +19,8 @@ let lastDeviceStatus = null;
 let commandSequence = 0;
 
 function getCommandTtlMs() {
-  const ttl = Number(process.env.COMMAND_TTL_MS || 2000);
-  return Number.isFinite(ttl) && ttl > 0 ? ttl : 2000;
+  const ttl = Number(process.env.COMMAND_TTL_MS || 750);
+  return Number.isFinite(ttl) && ttl > 0 ? ttl : 750;
 }
 
 function getCommandQueueMax() {
@@ -47,6 +48,19 @@ function parseSpeed(speed) {
   }
 
   return Math.min(255, Math.max(0, Math.round(numericSpeed)));
+}
+
+function parseSignedMotorSpeed(value, label) {
+  const numericSpeed = Number(value);
+
+  if (!Number.isFinite(numericSpeed)) {
+    const error = new Error(`${label} must be a number between -255 and 255.`);
+    error.statusCode = 400;
+    error.code = 'INVALID_MOTOR_SPEED';
+    throw error;
+  }
+
+  return Math.min(255, Math.max(-255, Math.round(numericSpeed)));
 }
 
 function assertValidCommand(command) {
@@ -124,6 +138,15 @@ function motorPayload(command, speed, direction = null) {
   return motorCommand;
 }
 
+function drivePayload(payload) {
+  return {
+    command: 'drive',
+    leftSpeed: parseSignedMotorSpeed(payload.leftSpeed, 'leftSpeed'),
+    rightSpeed: parseSignedMotorSpeed(payload.rightSpeed, 'rightSpeed'),
+    mode: 'drive'
+  };
+}
+
 function buildStopCommand(reason = 'idle') {
   return {
     ...motorPayload('stop', 0),
@@ -131,6 +154,7 @@ function buildStopCommand(reason = 'idle') {
     reason,
     createdAt: null,
     expiresAt: null,
+    expiresInMs: 0,
     queueLength: commandQueue.length,
     serverTime: new Date().toISOString()
   };
@@ -141,13 +165,16 @@ function saveCommand(payload) {
 
   assertValidCommand(command);
 
-  const speed = parseSpeed(payload.speed);
-  const direction = parseTurnDirection(command, payload.direction);
+  const speed = command === 'drive' ? null : parseSpeed(payload.speed);
+  const direction = command === 'drive' ? null : parseTurnDirection(command, payload.direction);
   const now = Date.now();
   const ttlMs = getCommandTtlMs();
+  const motorCommand = command === 'drive'
+    ? drivePayload(payload)
+    : motorPayload(command, speed, direction);
 
   const queuedCommand = {
-    ...motorPayload(command, speed, direction),
+    ...motorCommand,
     sequence: ++commandSequence,
     active: true,
     reason: 'queued_command',
@@ -161,12 +188,18 @@ function saveCommand(payload) {
     lastDeliveredCommand = queuedCommand;
   } else {
     purgeExpiredCommands(now);
+
+    if (command === 'drive') {
+      commandQueue = commandQueue.filter((queuedCommandItem) => queuedCommandItem.command !== 'drive');
+    }
+
     commandQueue.push(queuedCommand);
     trimCommandQueue();
   }
 
   return {
     ...queuedCommand,
+    expiresInMs: ttlMs,
     queueLength: commandQueue.length,
     serverTime: new Date().toISOString()
   };
@@ -188,6 +221,7 @@ function getCommandForDevice(deviceId) {
     return {
       ...lastDeliveredCommand,
       deviceId,
+      expiresInMs: getExpiresInMs(lastDeliveredCommand, now),
       queueLength: commandQueue.length,
       serverTime: new Date(now).toISOString()
     };
@@ -207,9 +241,20 @@ function getCommandForDevice(deviceId) {
     ...lastDeliveredCommand,
     reason: 'last_delivered_replay',
     deviceId,
+    expiresInMs: getExpiresInMs(lastDeliveredCommand, now),
     queueLength: commandQueue.length,
     serverTime: new Date(now).toISOString()
   };
+}
+
+function getExpiresInMs(command, now = Date.now()) {
+  const expiresAt = Date.parse(command.expiresAt);
+
+  if (!Number.isFinite(expiresAt)) {
+    return 0;
+  }
+
+  return Math.max(0, expiresAt - now);
 }
 
 function purgeExpiredCommands(now = Date.now()) {

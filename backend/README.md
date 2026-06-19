@@ -64,7 +64,7 @@ FRONTEND_ORIGIN=http://localhost:5173
 DEVICE_ID=carrito-001
 DEVICE_TOKEN=change_me
 API_TOKEN=change_me
-COMMAND_TTL_MS=2000
+COMMAND_TTL_MS=750
 COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
@@ -82,7 +82,7 @@ FRONTEND_ORIGIN=https://tu-frontend.com
 DEVICE_ID=carrito-001
 DEVICE_TOKEN=tu_token_del_dispositivo
 API_TOKEN=tu_token_del_front
-COMMAND_TTL_MS=2000
+COMMAND_TTL_MS=750
 COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
@@ -134,6 +134,7 @@ http://192.168.1.50:3000/api/camera/frame
 ## Comandos validos
 
 ```text
+drive
 forward
 backward
 stop
@@ -142,14 +143,15 @@ left
 right
 ```
 
-Si no se envia `speed`, se usa `180`. El valor se limita entre `0` y `255`.
+En `drive`, `leftSpeed` y `rightSpeed` se limitan entre `-255` y `255`. En comandos legacy, si no se envia `speed`, se usa `180` y se limita entre `0` y `255`.
 
-Los comandos de movimiento se guardan en una cola en memoria. `COMMAND_QUEUE_MAX` limita el numero maximo de comandos pendientes; si se llena, se conservan los mas recientes. `stop` y `brake` limpian la cola para evitar movimientos pendientes despues de frenar.
+Los comandos de movimiento se guardan en una cola en memoria. `COMMAND_QUEUE_MAX` limita el numero maximo de comandos pendientes; si se llena, se conservan los mas recientes. Para conduccion continua, los comandos `drive` pendientes se compactan y se conserva el `drive` mas reciente para evitar lag. `stop` y `brake` limpian la cola para evitar movimientos pendientes despues de frenar.
 
 Conversion enviada a la ESP32:
 
 | Comando | leftSpeed | rightSpeed | mode |
 | --- | ---: | ---: | --- |
+| `drive` | `leftSpeed` directo | `rightSpeed` directo | `drive` |
 | `forward` | `speed` | `speed` | `drive` |
 | `backward` | `-speed` | `-speed` | `drive` |
 | `stop` | `0` | `0` | `drive` |
@@ -185,20 +187,22 @@ Body:
 
 ```json
 {
+  "command": "drive",
+  "leftSpeed": 180,
+  "rightSpeed": 180
+}
+```
+
+Tambien se mantienen los comandos anteriores, por ejemplo:
+
+```json
+{
   "command": "forward",
   "speed": 180
 }
 ```
 
-Para giros combinados con avance o reversa:
-
-```json
-{
-  "command": "left",
-  "speed": 180,
-  "direction": "backward"
-}
-```
+Para giros combinados con avance o reversa en los comandos legacy `left` y `right`, puedes enviar `direction` con `forward` o `backward`.
 
 Ejemplo:
 
@@ -206,7 +210,7 @@ Ejemplo:
 curl -X POST http://localhost:3000/api/commands \
   -H "Authorization: Bearer change_me" \
   -H "Content-Type: application/json" \
-  -d "{\"command\":\"forward\",\"speed\":180}"
+  -d "{\"command\":\"drive\",\"leftSpeed\":180,\"rightSpeed\":180}"
 ```
 
 ### Consultar comando desde la ESP32 principal
@@ -230,8 +234,7 @@ Respuesta activa:
   "ok": true,
   "deviceId": "carrito-001",
   "command": {
-    "command": "forward",
-    "speed": 180,
+    "command": "drive",
     "leftSpeed": 180,
     "rightSpeed": 180,
     "mode": "drive",
@@ -239,8 +242,9 @@ Respuesta activa:
     "reason": "queued_command",
     "sequence": 42,
     "createdAt": "2026-06-14T12:00:00.000Z",
-    "expiresAt": "2026-06-14T12:00:02.000Z",
-    "ttlMs": 2000,
+    "expiresAt": "2026-06-14T12:00:00.750Z",
+    "ttlMs": 750,
+    "expiresInMs": 250,
     "deviceId": "carrito-001",
     "queueLength": 3,
     "serverTime": "2026-06-14T12:00:00.500Z"

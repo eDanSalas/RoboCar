@@ -10,14 +10,24 @@ import { createSocketClient } from './socket/socketClient.js';
 
 const DEFAULT_SPEED = 180;
 const REPEAT_GUARD_MS = 250;
-const HELD_COMMAND_INTERVAL_MS = 300;
+const DRIVE_COMMAND_INTERVAL_MS = 100;
 
-const KEYBOARD_COMMANDS = {
-  w: { axis: 'drive', command: 'forward' },
-  s: { axis: 'drive', command: 'backward' },
-  a: { axis: 'turn', command: 'left' },
-  d: { axis: 'turn', command: 'right' }
+const CONTROL_DEFINITIONS = {
+  forward: { axis: 'throttle', value: 1 },
+  backward: { axis: 'throttle', value: -1 },
+  left: { axis: 'steering', value: 1 },
+  right: { axis: 'steering', value: -1 }
 };
+
+const KEYBOARD_CONTROLS = {
+  w: 'forward',
+  s: 'backward',
+  a: 'left',
+  d: 'right'
+};
+
+const THROTTLE_CONTROLS = ['forward', 'backward'];
+const STEERING_CONTROLS = ['left', 'right'];
 
 function App() {
   const [speed, setSpeed] = useState(DEFAULT_SPEED);
@@ -32,11 +42,13 @@ function App() {
   const [activeControls, setActiveControls] = useState(() => new Set());
 
   const lastRequestRef = useRef({ command: '', at: 0 });
+  const speedRef = useRef(DEFAULT_SPEED);
+  const activeDriveControlsRef = useRef(new Set());
   const activeKeyboardKeysRef = useRef(new Set());
-  const lastDriveKeyRef = useRef('');
-  const lastTurnKeyRef = useRef('');
-  const keyboardTimerRef = useRef(null);
-  const keyboardRequestActiveRef = useRef(false);
+  const lastThrottleControlRef = useRef('');
+  const lastSteeringControlRef = useRef('');
+  const driveTimerRef = useRef(null);
+  const driveRequestActiveRef = useRef(false);
 
   const refreshLatestFrame = useCallback(() => {
     setCameraImageSrc(`${API_BASE_URL}/api/camera/latest.jpg?ts=${Date.now()}`);
@@ -50,6 +62,10 @@ function App() {
       setError(gpsError.message);
     }
   }, []);
+
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   const setControlActive = useCallback((command, active) => {
     setActiveControls((current) => {
@@ -69,9 +85,9 @@ function App() {
     const now = Date.now();
     const isStop = command === 'stop';
     const immediate = options.immediate || isStop;
-    const selectedSpeed = isStop ? 0 : speed;
+    const selectedSpeed = isStop ? 0 : speedRef.current;
     const lastRequest = lastRequestRef.current;
-    const requestKey = `${command}:${options.direction || ''}`;
+    const requestKey = `${command}:${options.direction || ''}:${options.leftSpeed ?? ''}:${options.rightSpeed ?? ''}`;
 
     if (!immediate && lastRequest.command === requestKey && now - lastRequest.at < REPEAT_GUARD_MS) {
       return;
@@ -85,7 +101,9 @@ function App() {
       const payload = await sendCommand({
         command,
         speed: selectedSpeed,
-        direction: options.direction
+        direction: options.direction,
+        leftSpeed: options.leftSpeed,
+        rightSpeed: options.rightSpeed
       });
       setLastCommand(payload.command);
     } catch (requestError) {
@@ -93,7 +111,141 @@ function App() {
     } finally {
       setPendingCommand((current) => (current === command ? '' : current));
     }
-  }, [speed]);
+  }, []);
+
+  const stopDriveTimer = useCallback(() => {
+    if (!driveTimerRef.current) {
+      return;
+    }
+
+    window.clearInterval(driveTimerRef.current);
+    driveTimerRef.current = null;
+  }, []);
+
+  const buildDrivePayload = useCallback(() => {
+    const activeControlsSet = activeDriveControlsRef.current;
+    const throttleControl = activeControlsSet.has(lastThrottleControlRef.current)
+      ? lastThrottleControlRef.current
+      : findActiveControl(activeControlsSet, THROTTLE_CONTROLS);
+    const steeringControl = activeControlsSet.has(lastSteeringControlRef.current)
+      ? lastSteeringControlRef.current
+      : findActiveControl(activeControlsSet, STEERING_CONTROLS);
+
+    lastThrottleControlRef.current = throttleControl;
+    lastSteeringControlRef.current = steeringControl;
+
+    if (!throttleControl && !steeringControl) {
+      return null;
+    }
+
+    const throttle = throttleControl
+      ? CONTROL_DEFINITIONS[throttleControl].value * speedRef.current
+      : 0;
+    const steering = steeringControl
+      ? CONTROL_DEFINITIONS[steeringControl].value * speedRef.current
+      : 0;
+
+    return {
+      leftSpeed: clampMotorSpeed(throttle + steering),
+      rightSpeed: clampMotorSpeed(throttle - steering)
+    };
+  }, []);
+
+  const sendActiveDriveCommand = useCallback(async () => {
+    if (driveRequestActiveRef.current) {
+      return;
+    }
+
+    const drivePayload = buildDrivePayload();
+
+    if (!drivePayload) {
+      return;
+    }
+
+    driveRequestActiveRef.current = true;
+
+    try {
+      await dispatchCommand('drive', {
+        ...drivePayload,
+        immediate: true
+      });
+    } finally {
+      driveRequestActiveRef.current = false;
+    }
+  }, [buildDrivePayload, dispatchCommand]);
+
+  const startDriveTimer = useCallback(() => {
+    if (driveTimerRef.current) {
+      return;
+    }
+
+    driveTimerRef.current = window.setInterval(() => {
+      sendActiveDriveCommand();
+    }, DRIVE_COMMAND_INTERVAL_MS);
+  }, [sendActiveDriveCommand]);
+
+  const startControl = useCallback((command) => {
+    const controlDefinition = CONTROL_DEFINITIONS[command];
+
+    if (!controlDefinition) {
+      return;
+    }
+
+    activeDriveControlsRef.current.add(command);
+    setControlActive(command, true);
+
+    if (controlDefinition.axis === 'throttle') {
+      lastThrottleControlRef.current = command;
+    }
+
+    if (controlDefinition.axis === 'steering') {
+      lastSteeringControlRef.current = command;
+    }
+
+    sendActiveDriveCommand();
+    startDriveTimer();
+  }, [sendActiveDriveCommand, setControlActive, startDriveTimer]);
+
+  const endControl = useCallback((command) => {
+    const controlDefinition = CONTROL_DEFINITIONS[command];
+
+    if (!controlDefinition) {
+      return;
+    }
+
+    if (!activeDriveControlsRef.current.has(command)) {
+      return;
+    }
+
+    activeDriveControlsRef.current.delete(command);
+    setControlActive(command, false);
+
+    if (controlDefinition.axis === 'throttle' && lastThrottleControlRef.current === command) {
+      lastThrottleControlRef.current = findActiveControl(activeDriveControlsRef.current, THROTTLE_CONTROLS);
+    }
+
+    if (controlDefinition.axis === 'steering' && lastSteeringControlRef.current === command) {
+      lastSteeringControlRef.current = findActiveControl(activeDriveControlsRef.current, STEERING_CONTROLS);
+    }
+
+    if (activeDriveControlsRef.current.size > 0) {
+      sendActiveDriveCommand();
+      return;
+    }
+
+    stopDriveTimer();
+    dispatchCommand('stop', { immediate: true });
+  }, [dispatchCommand, sendActiveDriveCommand, setControlActive, stopDriveTimer]);
+
+  const stopAllControls = useCallback(() => {
+    activeDriveControlsRef.current.clear();
+    activeKeyboardKeysRef.current.clear();
+    lastThrottleControlRef.current = '';
+    lastSteeringControlRef.current = '';
+    setActiveControls(new Set());
+    stopDriveTimer();
+    dispatchCommand('stop', { immediate: true });
+  }, [dispatchCommand, stopDriveTimer]);
 
   useEffect(() => {
     const socket = createSocketClient();
@@ -163,96 +315,15 @@ function App() {
   }, [refreshGps, refreshLatestFrame]);
 
   useEffect(() => {
-    function buildActiveKeyboardCommand() {
-      const activeKeys = activeKeyboardKeysRef.current;
-      const driveKey = activeKeys.has(lastDriveKeyRef.current)
-        ? lastDriveKeyRef.current
-        : findActiveKey(activeKeys, ['w', 's']);
-      const turnKey = activeKeys.has(lastTurnKeyRef.current)
-        ? lastTurnKeyRef.current
-        : findActiveKey(activeKeys, ['a', 'd']);
-      const driveCommand = driveKey ? KEYBOARD_COMMANDS[driveKey].command : '';
-      const turnCommand = turnKey ? KEYBOARD_COMMANDS[turnKey].command : '';
-
-      lastDriveKeyRef.current = driveKey;
-      lastTurnKeyRef.current = turnKey;
-
-      if (turnCommand) {
-        return {
-          command: turnCommand,
-          direction: driveCommand === 'backward' ? 'backward' : 'forward'
-        };
-      }
-
-      if (driveCommand) {
-        return {
-          command: driveCommand,
-          direction: ''
-        };
-      }
-
-      return null;
-    }
-
-    async function sendActiveKeyboardCommand() {
-      if (keyboardRequestActiveRef.current) {
-        return;
-      }
-
-      const activeCommand = buildActiveKeyboardCommand();
-
-      if (!activeCommand) {
-        return;
-      }
-
-      keyboardRequestActiveRef.current = true;
-
-      try {
-        await dispatchCommand(activeCommand.command, {
-          direction: activeCommand.direction,
-          immediate: true
-        });
-      } finally {
-        keyboardRequestActiveRef.current = false;
-      }
-    }
-
-    function startKeyboardTimer() {
-      if (keyboardTimerRef.current) {
-        return;
-      }
-
-      keyboardTimerRef.current = window.setInterval(() => {
-        sendActiveKeyboardCommand();
-      }, HELD_COMMAND_INTERVAL_MS);
-    }
-
-    function stopKeyboardTimerIfIdle() {
-      if (activeKeyboardKeysRef.current.size > 0 || !keyboardTimerRef.current) {
-        return;
-      }
-
-      window.clearInterval(keyboardTimerRef.current);
-      keyboardTimerRef.current = null;
-    }
-
     function resetActiveKeyboardControls() {
-      activeKeyboardKeysRef.current.clear();
-      lastDriveKeyRef.current = '';
-      lastTurnKeyRef.current = '';
-      setActiveControls(new Set());
-
-      if (keyboardTimerRef.current) {
-        window.clearInterval(keyboardTimerRef.current);
-        keyboardTimerRef.current = null;
-      }
+      stopAllControls();
     }
 
     function handleKeyDown(event) {
       const key = event.key.toLowerCase();
-      const keyAction = KEYBOARD_COMMANDS[key];
+      const command = KEYBOARD_CONTROLS[key];
 
-      if (!keyAction || isTypingTarget(event.target)) {
+      if (!command || isTypingTarget(event.target)) {
         return;
       }
 
@@ -263,44 +334,19 @@ function App() {
       }
 
       activeKeyboardKeysRef.current.add(key);
-      setControlActive(keyAction.command, true);
-
-      if (keyAction.axis === 'drive') {
-        lastDriveKeyRef.current = key;
-      }
-
-      if (keyAction.axis === 'turn') {
-        lastTurnKeyRef.current = key;
-      }
-
-      sendActiveKeyboardCommand();
-      startKeyboardTimer();
+      startControl(command);
     }
 
     function handleKeyUp(event) {
       const key = event.key.toLowerCase();
-      const keyAction = KEYBOARD_COMMANDS[key];
+      const command = KEYBOARD_CONTROLS[key];
 
-      if (!keyAction) {
+      if (!command) {
         return;
       }
 
       activeKeyboardKeysRef.current.delete(key);
-      setControlActive(keyAction.command, false);
-
-      if (keyAction.axis === 'drive' && lastDriveKeyRef.current === key) {
-        lastDriveKeyRef.current = findActiveKey(activeKeyboardKeysRef.current, ['w', 's']);
-      }
-
-      if (keyAction.axis === 'turn' && lastTurnKeyRef.current === key) {
-        lastTurnKeyRef.current = findActiveKey(activeKeyboardKeysRef.current, ['a', 'd']);
-      }
-
-      if (activeKeyboardKeysRef.current.size > 0) {
-        sendActiveKeyboardCommand();
-      }
-
-      stopKeyboardTimerIfIdle();
+      endControl(command);
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -312,12 +358,9 @@ function App() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', resetActiveKeyboardControls);
 
-      if (keyboardTimerRef.current) {
-        window.clearInterval(keyboardTimerRef.current);
-        keyboardTimerRef.current = null;
-      }
+      resetActiveKeyboardControls();
     };
-  }, [dispatchCommand, setControlActive]);
+  }, [endControl, startControl, stopAllControls]);
 
   return (
     <main className="app-shell">
@@ -330,7 +373,9 @@ function App() {
           <ControlPanel
             speed={speed}
             onSpeedChange={setSpeed}
-            onCommand={dispatchCommand}
+            onControlStart={startControl}
+            onControlEnd={endControl}
+            onStop={stopAllControls}
             pendingCommand={pendingCommand}
             activeCommands={activeControls}
           />
@@ -357,8 +402,12 @@ function isTypingTarget(target) {
   return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable;
 }
 
-function findActiveKey(activeKeys, keys) {
-  return keys.find((key) => activeKeys.has(key)) || '';
+function findActiveControl(activeControls, controls) {
+  return controls.find((control) => activeControls.has(control)) || '';
+}
+
+function clampMotorSpeed(value) {
+  return Math.min(255, Math.max(-255, Math.round(value)));
 }
 
 export default App;

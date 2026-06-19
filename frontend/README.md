@@ -120,17 +120,17 @@ El Front envia comandos por HTTP y recibe actualizaciones en tiempo real por soc
 ## Teclas de control
 
 ```text
-W              -> forward
-A              -> left
-S              -> backward
-D              -> right
+W              -> throttle adelante
+A              -> steering izquierda
+S              -> throttle reversa
+D              -> steering derecha
 ```
 
 La velocidad por defecto es `180` y se puede ajustar con el slider de `0` a `255`.
 
-Mientras una tecla de movimiento o un boton de movimiento se mantiene presionado, el Front vuelve a enviar el comando cada 300 ms para mantener vivo el ultimo comando del backend. El comando `stop` se envia solo al presionar el boton `Stop`.
+Mientras una tecla de movimiento o un boton de movimiento se mantiene presionado, el Front envia `drive` cada 100 ms con `leftSpeed` y `rightSpeed`. Al soltar el ultimo control activo, envia `stop` inmediatamente.
 
-Puedes combinar `W` o `S` con `A` o `D` para girar suavemente mientras avanza o va en reversa.
+Puedes combinar `W` o `S` con `A` o `D`: el Front calcula `leftSpeed = throttle + steering` y `rightSpeed = throttle - steering`, limitados entre `-255` y `255`.
 
 ## Interfaz
 

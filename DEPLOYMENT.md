@@ -21,7 +21,7 @@ FRONTEND_ORIGIN=http://localhost:5173
 DEVICE_ID=carrito-001
 DEVICE_TOKEN=change_me
 API_TOKEN=change_me
-COMMAND_TTL_MS=2000
+COMMAND_TTL_MS=750
 COMMAND_QUEUE_MAX=30
 MAX_FRAME_SIZE_MB=2
 ```
@@ -143,7 +143,7 @@ heroku config:set -a robotcar-backend `
   DEVICE_ID=carrito-001 `
   DEVICE_TOKEN=TU_DEVICE_TOKEN `
   API_TOKEN=TU_API_TOKEN `
-  COMMAND_TTL_MS=2000 `
+  COMMAND_TTL_MS=750 `
   COMMAND_QUEUE_MAX=30 `
   MAX_FRAME_SIZE_MB=2
 git subtree push --prefix backend heroku-backend main
